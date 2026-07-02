@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BCM cmsh Trainer</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230A0D10'/><text x='2' y='12' font-size='10' fill='%2376B900' font-family='monospace'>%25</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">[%]</span>
+    <span class="brand-name">cmsh trainer</span>
+    <span class="brand-sub">NVIDIA Base Command Manager · simulated cluster</span>
+  </div>
+  <div class="topbar-right">
+    <span class="chip" id="chip-nodes"><span class="led led-up"></span><span id="nodes-up">10/10</span> devices up</span>
+    <span class="chip chip-warn hidden" id="chip-modified"><span class="led led-mod"></span>uncommitted changes</span>
+    <button class="btn" id="btn-reset" title="Reset the simulated cluster to its initial state">Reset cluster</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <section class="term-wrap" aria-label="cmsh terminal">
+    <div class="term-titlebar">
+      <span>root@basecm11: cmsh</span>
+      <span class="term-titlebar-hint">Tab completes · ↑↓ history · Ctrl+L clears</span>
+    </div>
+    <div class="term" id="term">
+      <div id="term-out"></div>
+      <div class="term-input-row">
+        <span class="term-prompt" id="term-prompt"></span>
+        <input id="term-input" type="text" autocomplete="off" autocapitalize="off"
+               autocorrect="off" spellcheck="false" aria-label="cmsh command input">
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel rack-panel" aria-label="rack view">
+      <h2 class="panel-title">Rack elevation <span class="panel-title-note">live</span></h2>
+      <div class="rack" id="rack"></div>
+    </section>
+
+    <section class="panel lessons-panel" aria-label="guided lessons">
+      <h2 class="panel-title">Guided lessons <span class="panel-title-note" id="lesson-progress"></span></h2>
+      <div id="lessons"></div>
+      <details class="cheatsheet">
+        <summary>Command cheat sheet</summary>
+        <pre>ls / list        list objects in the mode
+use &lt;name&gt;       select an object
+show [name]      all properties of an object
+get / set        read / stage a property
+commit           save staged changes
+refresh          discard staged changes
+modified         list uncommitted objects
+clone &lt;a&gt; &lt;b&gt;    duplicate an object
+power on|off|reset -n node001..node004
+status           device states
+add physicalnode &lt;host&gt; [ip]   register a node
+imageupdate [-w] -n &lt;nodes&gt;    sync image (dry run without -w)
+home / exit      top level / up one level</pre>
+      </details>
+    </section>
+  </aside>
+
+</main>
+
+<script src="js/state.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/lessons.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
