@@ -3,7 +3,7 @@
 A browser-based simulator of **cmsh**, the command-line shell of NVIDIA Base Command
 Manager, for practicing common cluster-administration workflows without real hardware.
 
-**Live demo: [bcm-simulator.vercel.app](https://bcm-simulator.vercel.app)**
+**Live demo: [kyle-law.github.io/bcm-simulator](https://kyle-law.github.io/bcm-simulator/)**
 
 Everything runs client-side — no backend, no build step, no dependencies.
 
