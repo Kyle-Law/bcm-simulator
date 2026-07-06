@@ -40,6 +40,7 @@
         status: 'UP',
         power: 'on',
         provisioned: true,
+        runningimage: 'default-image',
       };
     }
 

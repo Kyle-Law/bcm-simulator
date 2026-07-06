@@ -345,9 +345,116 @@ body {
   text-align: left;
 }
 .step-hint:hover { text-decoration: underline; }
-.step-hint-cmd { color: var(--amber); font-family: var(--mono); font-size: 11.5px; display: block; margin-top: 3px; }
+.step-hint-cmd { color: var(--amber); font-family: var(--mono); font-size: 11.5px; display: block; margin-top: 3px; cursor: pointer; }
+.step-hint-cmd:hover { text-decoration: underline; }
 
-.cheatsheet { margin-top: 10px; }
+/* Start / restart buttons shared by lessons and labs. */
+.scenario-actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn-start, .btn-hint {
+  font-size: 11.5px;
+  padding: 5px 12px;
+}
+.btn-start { color: var(--green); border-color: var(--green-dim); }
+.btn-start:hover { border-color: var(--green); }
+.lesson-title, .lab-title { flex: 1; }
+
+/* ---------- troubleshooting labs ---------- */
+
+.panel-lead {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: -4px 0 12px;
+}
+
+.lab {
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: var(--term-bg);
+  overflow: hidden;
+}
+.lab.active { border-color: var(--amber); }
+.lab.solved { border-color: var(--green-dim); }
+
+.lab-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.lab-head:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+
+.lab-diff {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid var(--panel-edge);
+  flex: none;
+}
+.diff-beginner     { color: var(--green); border-color: var(--green-dim); }
+.diff-intermediate { color: var(--amber); border-color: #5c4a1e; }
+.diff-advanced     { color: var(--red); border-color: #5c2420; }
+
+.lab-check { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); flex: none; }
+.lab.active .lab-check { color: var(--amber); }
+.lab.solved .lab-check { color: var(--green); }
+
+.lab-body { padding: 2px 12px 12px; display: none; }
+.lab.open .lab-body { display: block; }
+
+.lab-briefing { color: var(--muted); font-size: 12px; line-height: 1.55; margin-bottom: 10px; }
+
+.lab-goals {
+  border-top: 1px solid #1a2128;
+  padding-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.goal {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.goal.done { color: var(--ink); }
+.goal-box {
+  font-family: var(--mono);
+  color: var(--faint);
+  flex: none;
+}
+.goal.done .goal-box { color: var(--green); }
+
+.lab-hints {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.lab-hints li { margin-bottom: 4px; }
+.lab-hints li::marker { color: var(--amber); }
+
+.btn-block { width: 100%; margin-top: 10px; }
+
+.refs-panel { display: flex; flex-direction: column; }
+
+.cheatsheet { margin-top: 0; }
 .cheatsheet summary {
   font-family: var(--mono);
   font-size: 11px;

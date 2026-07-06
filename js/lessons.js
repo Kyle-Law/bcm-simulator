@@ -153,6 +153,10 @@
       id: 'images',
       title: 'Software images',
       blurb: 'Nodes are provisioned from software images. Clone one to customize it without touching production.',
+      // Pre-create a gpu category so this lesson stands alone.
+      setup(state) {
+        state.categories.gpu = Object.assign({}, state.categories.default, { name: 'gpu' });
+      },
       steps: [
         {
           text: 'Enter softwareimage mode and list the images.',
@@ -170,7 +174,7 @@
           check: ctx => !!ctx.engine.state.softwareimages['gpu-image'],
         },
         {
-          text: 'Point the gpu category at the new image: in category mode, "set gpu softwareimage gpu-image", then commit. (Run the categories lesson first if gpu doesn\'t exist.)',
+          text: 'Point the gpu category at the new image: in category mode, "set gpu softwareimage gpu-image", then commit. (A gpu category is already present in this lab.)',
           hint: 'category; set gpu softwareimage gpu-image; commit',
           check: ctx => ctx.engine.state.categories.gpu &&
             ctx.engine.state.categories.gpu.softwareimage === 'gpu-image',

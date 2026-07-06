@@ -46,7 +46,7 @@
   };
 
   const GLOBAL_COMMANDS = ['ls', 'list', 'use', 'show', 'get', 'set', 'clear', 'commit',
-    'refresh', 'modified', 'add', 'remove', 'clone', 'help', 'exit', 'home', 'quit', '..'];
+    'refresh', 'modified', 'add', 'remove', 'clone', 'events', 'help', 'exit', 'home', 'quit', '..'];
   const DEVICE_COMMANDS = ['status', 'power', 'sysinfo', 'latestmetricdata', 'reboot', 'imageupdate'];
 
   const ZERO_MAC = '00:00:00:00:00:00';
@@ -108,6 +108,8 @@
       this.onEvent = opts.onEvent || function () {};
       this.onStateChange = opts.onStateChange || function () {};
       this.timers = [];
+      this.eventLog = [];
+      this.currentSetup = null;
       this.resetSession();
     }
 
@@ -115,11 +117,16 @@
       this.session = { mode: null, object: null, staged: {} };
     }
 
-    reset() {
+    /* Rebuild the cluster. An optional setup(state, engine) mutates the fresh
+     * state (and may stage session changes) to produce a scenario fixture. */
+    reset(setup) {
       for (const t of this.timers) clearTimeout(t);
       this.timers = [];
       this.state = this.makeState();
       this.resetSession();
+      this.eventLog = [];
+      this.currentSetup = setup || null;
+      if (setup) setup(this.state, this);
       this.onStateChange();
     }
 
@@ -132,7 +139,11 @@
     }
 
     emitEvent(text, severity) {
-      this.onEvent([line(eventTimestamp() + ' [' + (severity || 'notice') + '] ' +
+      severity = severity || 'notice';
+      const stamp = eventTimestamp();
+      this.eventLog.push({ stamp, severity, text });
+      if (this.eventLog.length > 100) this.eventLog.shift();
+      this.onEvent([line(stamp + ' [' + severity + '] ' +
         this.state.cluster + ': ' + text, 'event')]);
       this.onStateChange();
     }
@@ -246,6 +257,7 @@
         case 'add': return this.cmdAdd(args);
         case 'remove': return this.cmdRemove(args);
         case 'clone': return this.cmdClone(args);
+        case 'events': return this.cmdEvents(args);
       }
 
       if (s.mode === 'device') {
@@ -298,6 +310,7 @@
         out.push(line('  ' + pad('modified', 16) + 'List objects with uncommitted changes'));
         out.push(line('  ' + pad('commit', 16) + 'Commit all pending changes'));
         out.push(line('  ' + pad('refresh', 16) + 'Discard all pending changes'));
+        out.push(line('  ' + pad('events [n]', 16) + 'Show the last n cluster events'));
         out.push(line('  ' + pad('quit', 16) + 'End the cmsh session'));
         return out;
       }
@@ -315,6 +328,7 @@
         ['commit', 'Save pending changes'],
         ['refresh', 'Discard pending changes'],
         ['modified', 'List uncommitted objects'],
+        ['events [n]', 'Show the last n cluster events'],
         ['exit / ..', 'Go up one level'],
         ['home', 'Return to the top level'],
       ];
@@ -480,7 +494,9 @@
       if (t.error) return t.error;
       if (t.rest.length < 1) return [err('set: property name required')];
       const prop = t.rest[0].toLowerCase();
-      const value = t.rest.slice(1).join(' ');
+      let value = t.rest.slice(1).join(' ');
+      // Strip a matching pair of surrounding quotes, like a real shell would.
+      if (value.length >= 2 && /^"[^]*"$|^'[^]*'$/.test(value)) value = value.slice(1, -1);
       if (!MODES[mode].props.includes(prop)) {
         return [err('set: no such property: ' + prop)];
       }
@@ -751,6 +767,7 @@
             }, 2000);
             this.schedule(() => {
               d.provisioned = true;
+              d.runningimage = image;
               d.status = 'UP';
               this.emitEvent('Provisioning completed: sent ' + this.state.cluster +
                 ':/cm/images/' + image + ' to ' + n + ':/');
@@ -802,6 +819,7 @@
             ':/cm/images/' + image + ' to ' + n + ':/, mode UPDATE, dry run = ' + (write ? 'no' : 'yes'));
         }, 700);
         this.schedule(() => {
+          if (write) d.runningimage = image;
           this.emitEvent('Provisioning completed: sent ' + this.state.cluster +
             ':/cm/images/' + image + ' to ' + n + ':/' + (write ? '' : ' (dry run, no changes written)'));
         }, 3200);
@@ -840,6 +858,16 @@
         ['gpu_utilization', 'gpu:average', r(0, 98, 1) + '%', now],
         ['gpu_temperature', 'gpu:average', r(35, 78, 0) + ' C', now],
       ]);
+    }
+
+    cmdEvents(args) {
+      let n = 10;
+      const numArg = args.find(a => /^\d+$/.test(a));
+      if (numArg) n = parseInt(numArg, 10);
+      const log = this.eventLog.slice(-n);
+      if (!log.length) return [line('No events recorded yet.', 'muted')];
+      return log.map(e => line(e.stamp + ' [' + e.severity + '] ' +
+        this.state.cluster + ': ' + e.text, 'event'));
     }
 
     /* ---------- tab completion ---------- */

@@ -30,6 +30,15 @@ python3 -m http.server 8080
 - **Guided lessons** — eight auto-checked exercises covering navigation, device
   status & power, the set/commit/refresh workflow, categories, software images,
   node provisioning, users, and monitoring. Progress is saved in localStorage.
+- **Troubleshooting labs** — five scenarios that each load their own *broken*
+  cluster and are graded on cluster state, not on the commands you type. You get
+  a briefing, a live goal checklist that ticks off as you fix things, and
+  progressive hints. Labs: an offline node, a node that won't provision (unknown
+  MAC), an abandoned uncommitted change, a category pointing at a missing image,
+  and a GPU node running the wrong image.
+
+Each lesson and lab has a **Start in clean cluster** button, so you can isolate
+your practice to one task and retry it from a known-good starting point.
 
 ## Simulated cmsh coverage
 
@@ -39,6 +48,7 @@ python3 -m http.server 8080
 | Navigation | `use`, `exit` / `..`, `home`, `help`, `quit` |
 | Objects | `ls` / `list`, `show`, `get`, `set`, `clear`, `add`, `clone`, `remove` |
 | Change management | `commit`, `refresh`, `modified` (with `*` prompt markers) |
+| Events | `events [n]` — replay the last n cluster events |
 | Device ops | `status`, `power status/on/off/reset [-n node001..node004]`, `reboot`, `sysinfo`, `latestmetricdata` |
 | Provisioning | `add physicalnode <host> [ip]`, MAC identification, `imageupdate [-w] -n <nodes>` (dry run without `-w`) |
 
@@ -52,14 +62,17 @@ software image, with matching event lines.
 
 ## Instructor tips
 
-Deep-link a pre-typed session with the `play` query parameter:
+Deep-link straight into one isolated scenario with the `scenario` query
+parameter (a lesson or lab id), or pre-type a command sequence with `play`:
 
 ```
+index.html?scenario=fix-provisioning
 index.html?play=device;ls;power%20off%20-n%20node002
 ```
 
-The **Reset cluster** button restores the initial cluster state; lesson progress
-is kept.
+The **Reset cluster** button restores the current scenario's starting state (or
+the base cluster if none is active). **Reset all progress** clears lesson and lab
+completion. Both leave the other alone.
 
 ## Layout
 
@@ -67,9 +80,10 @@ is kept.
 index.html        page shell
 css/style.css     styling
 js/state.js       initial cluster state
-js/engine.js      cmsh interpreter (modes, staging, power sim, completion)
+js/engine.js      cmsh interpreter (modes, staging, power sim, events, completion)
 js/lessons.js     guided lessons and their auto-checks
-js/app.js         terminal / rack / lessons UI wiring
+js/labs.js        troubleshooting labs (fixtures + state-based goals)
+js/app.js         terminal / rack / lessons / labs UI wiring
 ```
 
-`state.js`, `engine.js`, and `lessons.js` also load under Node for testing.
+`state.js`, `engine.js`, `lessons.js`, and `labs.js` also load under Node for testing.

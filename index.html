@@ -48,6 +48,15 @@
     <section class="panel lessons-panel" aria-label="guided lessons">
       <h2 class="panel-title">Guided lessons <span class="panel-title-note" id="lesson-progress"></span></h2>
       <div id="lessons"></div>
+    </section>
+
+    <section class="panel labs-panel" aria-label="troubleshooting labs">
+      <h2 class="panel-title">Troubleshooting labs <span class="panel-title-note" id="lab-progress"></span></h2>
+      <p class="panel-lead">Each lab loads its own broken cluster. Diagnose it, fix it, and every goal ticks off on its own.</p>
+      <div id="labs"></div>
+    </section>
+
+    <section class="panel refs-panel" aria-label="reference">
       <details class="cheatsheet">
         <summary>Command cheat sheet</summary>
         <pre>ls / list        list objects in the mode
@@ -57,6 +66,7 @@ get / set        read / stage a property
 commit           save staged changes
 refresh          discard staged changes
 modified         list uncommitted objects
+events [n]       show recent cluster events
 clone &lt;a&gt; &lt;b&gt;    duplicate an object
 power on|off|reset -n node001..node004
 status           device states
@@ -64,6 +74,7 @@ add physicalnode &lt;host&gt; [ip]   register a node
 imageupdate [-w] -n &lt;nodes&gt;    sync image (dry run without -w)
 home / exit      top level / up one level</pre>
       </details>
+      <button class="btn btn-block" id="btn-reset-progress" title="Clear lesson and lab progress">Reset all progress</button>
     </section>
   </aside>
 
@@ -72,6 +83,7 @@ home / exit      top level / up one level</pre>
 <script src="js/state.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/lessons.js"></script>
+<script src="js/labs.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
