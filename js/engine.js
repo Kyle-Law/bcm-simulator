@@ -51,6 +51,9 @@
 
   const ZERO_MAC = '00:00:00:00:00:00';
 
+  // Computed/read-only fields, visible to `get`/`show` but not settable.
+  const READONLY_PROPS = { device: ['runningimage'] };
+
   const POWER_OPS = ['status', 'on', 'off', 'reset'];
 
   function line(text, cls) { return { text, cls: cls || '' }; }
@@ -136,6 +139,43 @@
         fn();
       }, ms);
       this.timers.push(t);
+    }
+
+    /* JSON-safe copy of everything needed to resume this exact session later
+     * (e.g. across a page reload). Scheduled timers are not part of it. */
+    snapshot() {
+      return JSON.parse(JSON.stringify({
+        state: this.state,
+        session: this.session,
+        eventLog: this.eventLog,
+      }));
+    }
+
+    /* Restore a snapshot taken by snapshot(). Any device that was mid-boot
+     * when the snapshot was taken had its pending timers dropped, so it is
+     * fast-forwarded to the state those timers would have produced. */
+    restoreSnapshot(snap) {
+      for (const t of this.timers) clearTimeout(t);
+      this.timers = [];
+      this.state = JSON.parse(JSON.stringify(snap.state));
+      this.session = JSON.parse(JSON.stringify(snap.session));
+      this.eventLog = JSON.parse(JSON.stringify(snap.eventLog || []));
+      this.settleTransitions();
+      this.onStateChange();
+    }
+
+    settleTransitions() {
+      for (const name in this.state.devices) {
+        const d = this.state.devices[name];
+        if (d.status !== 'INSTALLER_BOOTING' && d.status !== 'INSTALLING') continue;
+        if (d.mac === ZERO_MAC) {
+          d.status = 'DOWN';
+        } else {
+          d.status = 'UP';
+          d.provisioned = true;
+          d.runningimage = this.nodeImage(name);
+        }
+      }
     }
 
     emitEvent(text, severity) {
@@ -463,6 +503,7 @@
       if (mode === 'device') {
         const cat = o.category && this.effective('category', o.category);
         rows.push(['Software image', cat ? cat.softwareimage + ' (from category)' : '']);
+        rows.push(['Running image', o.runningimage || '']);
         rows.push(['Partition', 'base']);
         rows.push(['Status', '[ ' + o.status + ' ]']);
         rows.push(['Type', o.type]);
@@ -479,7 +520,8 @@
       if (t.error) return t.error;
       if (!t.rest.length) return [err('get: property name required')];
       const prop = t.rest[0].toLowerCase();
-      if (!MODES[mode].props.includes(prop)) {
+      const readonly = (READONLY_PROPS[mode] || []).includes(prop);
+      if (!MODES[mode].props.includes(prop) && !readonly) {
         return [err('get: no such property: ' + prop)];
       }
       const o = this.effective(mode, t.name);
@@ -872,7 +914,10 @@
 
     /* ---------- tab completion ---------- */
 
-    complete(text) {
+    complete(fullText) {
+      // Only the segment after the last ';' is live; earlier segments are
+      // already-committed commands as far as completion is concerned.
+      const text = fullText.slice(fullText.lastIndexOf(';') + 1);
       const endsWithSpace = /\s$/.test(text);
       const tokens = text.trim().length ? text.trim().split(/\s+/) : [];
       const current = endsWithSpace ? '' : (tokens.pop() || '');

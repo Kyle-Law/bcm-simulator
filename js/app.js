@@ -22,6 +22,7 @@
   const LESSONS = CmshLessons.LESSONS;
   const LABS = CmshLabs.LABS;
   const STORAGE_KEY = 'bcm-cmsh-trainer-progress-v2';
+  const SNAPSHOT_KEY = 'bcm-cmsh-trainer-snapshot-v1';
 
   /* ---------- progress ---------- */
 
@@ -39,24 +40,26 @@
   const labSolved = id => !!progress.labs[id];
 
   // The scenario currently being graded and driving the cluster.
-  let active = null; // { kind: 'lesson' | 'lab', id }
+  let active = null; // { kind: 'lesson' | 'lab', id, drill? }
   const openLessons = new Set();
   const openLabs = new Set();
   const labHintsShown = {}; // transient: how many hints revealed per lab
 
-  // Restore a lesson as active on boot (safe against the base cluster); labs
-  // require an explicit Start because they need their broken fixture loaded.
-  if (progress.active && progress.active.kind === 'lesson' &&
-      LESSONS.some(l => l.id === progress.active.id)) {
+  // Recover which scenario was active, lesson or lab. Whether we can recover
+  // its exact cluster state too (not just which one it was) depends on
+  // whether a matching snapshot exists — see the boot section below.
+  if (progress.active &&
+      ((progress.active.kind === 'lesson' && LESSONS.some(l => l.id === progress.active.id)) ||
+       (progress.active.kind === 'lab' && LABS.some(l => l.id === progress.active.id)))) {
     active = progress.active;
-    openLessons.add(active.id);
   } else {
     active = { kind: 'lesson', id: LESSONS[0].id };
-    openLessons.add(LESSONS[0].id);
   }
+  if (active.kind === 'lesson') openLessons.add(active.id);
+  else if (!active.drill) openLabs.add(active.id);
 
-  function setActive(kind, id) {
-    active = { kind, id };
+  function setActive(kind, id, extra) {
+    active = Object.assign({ kind, id }, extra || {});
     progress.active = active;
     saveProgress();
   }
@@ -74,8 +77,28 @@
       renderChips();
       renderPrompt();
       if (!inCommand && !loading) gradeActive('');
+      scheduleSnapshotSave();
     },
   });
+
+  /* ---------- snapshot persistence ----------
+   * Keeps a page reload from silently dropping the active scenario's cluster
+   * fixture — without this, reloading mid-lab (or mid-lesson, for lessons
+   * with their own setup fixture) would quietly swap back to a healthy base
+   * cluster while the UI still claimed the scenario was in progress. */
+
+  let snapshotTimer = null;
+
+  function saveSnapshot() {
+    try {
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ scenario: active, snap: engine.snapshot() }));
+    } catch (e) { /* private mode or quota exceeded */ }
+  }
+
+  function scheduleSnapshotSave() {
+    clearTimeout(snapshotTimer);
+    snapshotTimer = setTimeout(saveSnapshot, 350);
+  }
 
   /* ---------- terminal rendering ---------- */
 
@@ -293,17 +316,21 @@
     const lab = LABS.find(l => l.id === active.id);
     if (!lab) return;
     const solvedNow = lab.goals.every(g => g.done(engine));
-    renderLabs();
     if (solvedNow && !labSolved(lab.id)) {
       progress.labs[lab.id] = true;
+      const wasDrill = !!active.drill;
+      if (wasDrill) { active.drill = false; progress.active = active; openLabs.add(lab.id); }
       saveProgress();
       appendLines([
         { text: '' },
-        { text: '✔ Lab solved: ' + lab.title + ' — all goals met.', cls: 'ok' },
+        { text: wasDrill
+            ? '✔ Drill solved — it was: ' + lab.title + ' (' + lab.difficulty + ').'
+            : '✔ Lab solved: ' + lab.title + ' — all goals met.',
+          cls: 'ok' },
       ]);
-      renderLabs();
       scrollTerm();
     }
+    renderLabs();
   }
 
   /* ---------- starting scenarios ---------- */
@@ -333,28 +360,63 @@
     inputEl.focus();
   }
 
-  function startLab(id) {
+  function startLab(id, opts) {
+    opts = opts || {};
     const lab = LABS.find(l => l.id === id);
     if (!lab) return;
     loadFixture(lab.setup);
-    setActive('lab', id);
-    openLabs.add(id);
+    setActive('lab', id, { drill: !!opts.drill });
+    labHintsShown[id] = 0;
     outEl.innerHTML = '';
-    appendLines([
-      { text: '── Troubleshooting lab: ' + lab.title + ' (' + lab.difficulty + ') ──', cls: 'muted' },
-      ...wrap(lab.briefing).map(t => ({ text: t, cls: 'muted' })),
-      { text: '' },
-      { text: 'Goals:', cls: 'muted' },
-      ...lab.goals.map(g => ({ text: '  ▢ ' + g.text, cls: 'muted' })),
-      { text: '' },
-      { text: 'Investigate with "status", "events", "show", then fix and commit. Hints are on the right.', cls: 'muted' },
-      { text: '' },
-    ]);
+    if (opts.drill) {
+      openLabs.delete(id);
+      appendLines([
+        { text: '── Drill: unidentified fault ──', cls: 'muted' },
+        { text: 'Something is wrong with this cluster. Investigate with "status", "events", and "show", diagnose the problem, and fix it.', cls: 'muted' },
+        { text: 'This is a random pick from the troubleshooting labs — its name stays hidden until you solve it (or click Reveal).', cls: 'muted' },
+        { text: '' },
+      ]);
+    } else {
+      openLabs.add(id);
+      appendLines([
+        { text: '── Troubleshooting lab: ' + lab.title + ' (' + lab.difficulty + ') ──', cls: 'muted' },
+        ...wrap(lab.briefing).map(t => ({ text: t, cls: 'muted' })),
+        { text: '' },
+        { text: 'Goals:', cls: 'muted' },
+        ...lab.goals.map(g => ({ text: '  ▢ ' + g.text, cls: 'muted' })),
+        { text: '' },
+        { text: 'Investigate with "status", "events", "show", then fix and commit. Hints are on the right.', cls: 'muted' },
+        { text: '' },
+      ]);
+    }
     renderAll();
     // Re-grade in case the fixture already satisfies a goal (it shouldn't).
     checkLab();
+    saveSnapshot();
     scrollTerm();
     inputEl.focus();
+  }
+
+  function startDrill() {
+    // Prefer an unsolved lab so the drill has something to teach; if
+    // everything is already solved, any lab still works as a timed replay.
+    const unsolved = LABS.filter(l => !labSolved(l.id));
+    const pool = unsolved.length ? unsolved : LABS;
+    const lab = pool[Math.floor(Math.random() * pool.length)];
+    startLab(lab.id, { drill: true });
+  }
+
+  function revealDrill(id) {
+    if (!(active && active.kind === 'lab' && active.id === id && active.drill)) return;
+    active.drill = false;
+    progress.active = active;
+    saveProgress();
+    openLabs.add(id);
+    const lab = LABS.find(l => l.id === id);
+    appendLines([{ text: '' }, { text: 'Revealed: ' + lab.title + ' (' + lab.difficulty + ')', cls: 'event' }, { text: '' }]);
+    renderAll();
+    saveSnapshot();
+    scrollTerm();
   }
 
   // Wrap prose to ~76 columns for the terminal.
@@ -464,9 +526,58 @@
   function renderLabs() {
     labsEl.innerHTML = '';
     let solved = 0;
+    const drillId = active && active.kind === 'lab' && active.drill ? active.id : null;
+
+    if (drillId) {
+      const lab = LABS.find(l => l.id === drillId);
+      const metCount = lab.goals.filter(g => g.done(engine)).length;
+
+      const wrapEl = document.createElement('div');
+      wrapEl.className = 'lab active drill-mystery open';
+
+      const head = document.createElement('div');
+      head.className = 'lab-head';
+      head.innerHTML =
+        '<span class="lab-diff diff-drill">DRILL</span>' +
+        '<span class="lab-title">Unidentified fault</span>' +
+        '<span class="lab-check">active</span>';
+      wrapEl.appendChild(head);
+
+      const body = document.createElement('div');
+      body.className = 'lab-body';
+
+      const brief = document.createElement('p');
+      brief.className = 'lab-briefing';
+      brief.textContent = 'Something is wrong with this cluster. Find it and fix it — details stay hidden until you solve it or reveal it.';
+      body.appendChild(brief);
+
+      const goals = document.createElement('div');
+      goals.className = 'lab-goals';
+      const goalEl = document.createElement('div');
+      goalEl.className = 'goal' + (metCount === lab.goals.length ? ' done' : '');
+      goalEl.innerHTML = '<span class="goal-box">' + (metCount === lab.goals.length ? '✔' : '▢') + '</span>';
+      const gt = document.createElement('span');
+      gt.textContent = metCount + ' / ' + lab.goals.length + ' goals met';
+      goalEl.appendChild(gt);
+      goals.appendChild(goalEl);
+      body.appendChild(goals);
+
+      const actions = document.createElement('div');
+      actions.className = 'scenario-actions';
+      const revealBtn = document.createElement('button');
+      revealBtn.className = 'btn btn-hint';
+      revealBtn.textContent = 'Reveal';
+      revealBtn.addEventListener('click', () => revealDrill(drillId));
+      actions.appendChild(revealBtn);
+      body.appendChild(actions);
+
+      wrapEl.appendChild(body);
+      labsEl.appendChild(wrapEl);
+    }
 
     LABS.forEach(lab => {
-      const isActive = active && active.kind === 'lab' && active.id === lab.id;
+      if (lab.id === drillId) return; // shown as the mystery card above instead
+      const isActive = active && active.kind === 'lab' && active.id === lab.id && !active.drill;
       const done = labSolved(lab.id);
       if (done) solved++;
 
@@ -564,8 +675,8 @@
 
   document.getElementById('btn-reset').addEventListener('click', () => {
     if (active && active.kind === 'lab') {
-      if (!confirm('Restart this lab from its starting state?')) return;
-      startLab(active.id);
+      if (!confirm('Restart this ' + (active.drill ? 'drill' : 'lab') + ' from its starting state?')) return;
+      startLab(active.id, { drill: !!active.drill });
       return;
     }
     if (active && active.kind === 'lesson' && lessonSteps(active.id) > 0) {
@@ -589,20 +700,53 @@
     renderLabs();
   });
 
+  document.getElementById('btn-drill').addEventListener('click', startDrill);
+
   /* ---------- boot ---------- */
 
-  banner();
-  renderAll();
+  // Try to resume exactly where the active scenario left off. Without this,
+  // a reload would keep the "active lesson/lab" label but silently hand back
+  // a fresh, healthy base cluster — see the module comment above onEvent.
+  let restoredFromSnapshot = false;
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    const saved = raw && JSON.parse(raw);
+    if (saved && saved.scenario && saved.scenario.kind === active.kind && saved.scenario.id === active.id) {
+      active = saved.scenario;
+      progress.active = active;
+      if (active.kind === 'lab' && !active.drill) openLabs.add(active.id);
+      loading = true;
+      engine.restoreSnapshot(saved.snap);
+      loading = false;
+      restoredFromSnapshot = true;
+    }
+  } catch (e) { /* corrupt snapshot; fall through to a fresh fixture */ }
+
+  if (restoredFromSnapshot) {
+    banner();
+    const found = active.kind === 'lab' ? LABS.find(l => l.id === active.id) : LESSONS.find(l => l.id === active.id);
+    const label = active.kind === 'lab' && active.drill ? 'a troubleshooting drill' : (found && found.title);
+    if (label) appendLines([{ text: 'Resumed where you left off: ' + label + '.', cls: 'muted' }, { text: '' }]);
+    renderAll();
+    scrollTerm();
+  } else if (active.kind === 'lab') {
+    startLab(active.id, { drill: !!active.drill });
+  } else {
+    startLesson(active.id);
+  }
   inputEl.focus();
 
   // Deep links:
   //   ?scenario=<lesson-or-lab-id>  jump straight into one isolated scenario
+  //   ?drill=1                      start a random troubleshooting drill
   //   ?play=cmd;cmd;...             pre-type a sequence of commands
   const params = new URLSearchParams(location.search);
   const scenario = params.get('scenario');
   if (scenario) {
     if (LABS.some(l => l.id === scenario)) startLab(scenario);
     else if (LESSONS.some(l => l.id === scenario)) startLesson(scenario);
+  } else if (params.get('drill')) {
+    startDrill();
   }
   const play = params.get('play');
   if (play) {

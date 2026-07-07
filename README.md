@@ -38,7 +38,14 @@ python3 -m http.server 8080
   and a GPU node running the wrong image.
 
 Each lesson and lab has a **Start in clean cluster** button, so you can isolate
-your practice to one task and retry it from a known-good starting point.
+your practice to one task and retry it from a known-good starting point. The
+active scenario's cluster state is persisted, so reloading the page resumes
+exactly where you left off instead of quietly handing back a healthy cluster.
+
+- **Random drill** — a "Give me a random fault" button loads one of the
+  troubleshooting labs without telling you which one. You diagnose and fix it
+  blind, seeing only a live "goals met" count; the lab's name and difficulty
+  are revealed once you solve it (or on demand).
 
 ## Simulated cmsh coverage
 
@@ -63,10 +70,12 @@ software image, with matching event lines.
 ## Instructor tips
 
 Deep-link straight into one isolated scenario with the `scenario` query
-parameter (a lesson or lab id), or pre-type a command sequence with `play`:
+parameter (a lesson or lab id), jump into a blind drill with `drill=1`, or
+pre-type a command sequence with `play`:
 
 ```
 index.html?scenario=fix-provisioning
+index.html?drill=1
 index.html?play=device;ls;power%20off%20-n%20node002
 ```
 

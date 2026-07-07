@@ -408,6 +408,20 @@ body {
 .diff-beginner     { color: var(--green); border-color: var(--green-dim); }
 .diff-intermediate { color: var(--amber); border-color: #5c4a1e; }
 .diff-advanced     { color: var(--red); border-color: #5c2420; }
+.diff-drill        { color: var(--blue); border-color: #1f3f52; }
+
+.btn-drill-cta {
+  color: var(--blue);
+  border-color: #1f3f52;
+  margin-bottom: 12px;
+}
+.btn-drill-cta:hover { border-color: var(--blue); }
+
+.drill-mystery {
+  border-style: dashed;
+  border-color: #1f3f52;
+}
+.drill-mystery .lab-head { cursor: default; }
 
 .lab-check { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); flex: none; }
 .lab.active .lab-check { color: var(--amber); }
